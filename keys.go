@@ -51,3 +51,14 @@ func (s *KeysService) Rotate(ctx context.Context, id string) (*Key, error) {
 func (s *KeysService) Disable(ctx context.Context, id string) error {
 	return s.http.delete(ctx, fmt.Sprintf("/v1/keys/%s", id))
 }
+
+// Export retrieves the raw DEK material for a key.
+// Use this when migrating away from MAFATE to decrypt your data independently.
+// WARNING: Handle exported keys with extreme care. Store in a secure vault.
+func (s *KeysService) Export(ctx context.Context, id string) (*KeyExportResponse, error) {
+	var out KeyExportResponse
+	if err := s.http.post(ctx, fmt.Sprintf("/v1/keys/%s/export", id), nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}

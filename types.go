@@ -44,6 +44,23 @@ type ListKeysResponse struct {
 	Count int   `json:"count"`
 }
 
+// KeyExportResponse is returned by POST /v1/keys/{id}/export.
+type KeyExportResponse struct {
+	KeyID      string               `json:"key_id"`
+	Name       string               `json:"name"`
+	Algorithm  string               `json:"algorithm"`
+	Versions   []ExportedKeyVersion `json:"versions"`
+	ExportedAt string               `json:"exported_at"`
+	Warning    string               `json:"warning"`
+}
+
+// ExportedKeyVersion holds the raw DEK material for a single key version.
+type ExportedKeyVersion struct {
+	Version int    `json:"version"`
+	DEKHex  string `json:"dek_hex"`
+	Status  string `json:"status"`
+}
+
 // EncryptedData holds all fields returned by POST /v1/encrypt and
 // needed as input to POST /v1/decrypt.
 type EncryptedData struct {
