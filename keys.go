@@ -62,3 +62,10 @@ func (s *KeysService) Export(ctx context.Context, id string) (*KeyExportResponse
 	}
 	return &out, nil
 }
+
+// SetRotationPolicy configures automatic rotation for a key.
+// Pass nil for intervalDays to remove the rotation policy.
+func (s *KeysService) SetRotationPolicy(ctx context.Context, id string, intervalDays *int) error {
+	body := map[string]interface{}{"interval_days": intervalDays}
+	return s.http.patch(ctx, "/v1/keys/"+id+"/rotation", body, nil)
+}

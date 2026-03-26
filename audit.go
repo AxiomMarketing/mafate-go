@@ -21,6 +21,13 @@ func (s *AuditService) List(ctx context.Context, filters *AuditFilters) (*ListAu
 	return &out, nil
 }
 
+// VerifyChain checks the integrity of the audit log chain.
+func (s *AuditService) VerifyChain(ctx context.Context) (*AuditChainVerification, error) {
+	var result AuditChainVerification
+	err := s.http.get(ctx, "/v1/audit/verify", nil, &result)
+	return &result, err
+}
+
 // buildAuditParams converts an AuditFilters value into URL query parameters.
 // Nil or zero-value fields are not included.
 func buildAuditParams(f *AuditFilters) map[string]string {

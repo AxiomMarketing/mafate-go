@@ -150,3 +150,11 @@ type ListAuditResponse struct {
 	Limit  int          `json:"limit"`
 	Offset int          `json:"offset"`
 }
+
+// AuditChainVerification is returned by GET /v1/audit/verify.
+type AuditChainVerification struct {
+	Valid           bool `json:"valid"`
+	TotalEntries    int  `json:"total_entries"`
+	VerifiedEntries int  `json:"verified_entries"`
+	BrokenAt        *int `json:"broken_at,omitempty"`
+}
