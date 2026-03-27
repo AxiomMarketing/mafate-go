@@ -28,10 +28,12 @@ import (
 )
 
 func main() {
-    client := mafate.New("eaas_dev_sk_...",
-        mafate.WithBaseURL("http://localhost:8080"),
-        // mafate.WithTimeout(10*time.Second), // optional, default 30 s
-    )
+    client := mafate.New("eaas_sk_...")
+    // Optional: custom base URL or timeout
+    // client := mafate.New("eaas_sk_...",
+    //     mafate.WithBaseURL("https://api.your-domain.io"),
+    //     mafate.WithTimeout(10*time.Second),
+    // )
 
     ctx := context.Background()
 

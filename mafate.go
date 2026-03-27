@@ -2,7 +2,7 @@
 //
 // Basic usage:
 //
-//	client := mafate.New("eaas_dev_sk_...", mafate.WithBaseURL("http://localhost:8080"))
+//	client := mafate.New("eaas_sk_...")
 //
 //	encrypted, err := client.Encrypt(ctx, "données sensibles", keyID)
 //	plaintext, err := client.Decrypt(ctx, encrypted)
