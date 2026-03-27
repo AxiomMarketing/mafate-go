@@ -11,7 +11,7 @@ Go 1.21 or later.
 ## Install
 
 ```bash
-go get github.com/mafate-security/mafate-go
+go get github.com/AxiomMarketing/mafate-go
 ```
 
 ## Quick Start
@@ -24,14 +24,16 @@ import (
     "fmt"
     "log"
 
-    mafate "github.com/mafate-security/mafate-go"
+    mafate "github.com/AxiomMarketing/mafate-go"
 )
 
 func main() {
-    client := mafate.New("eaas_dev_sk_...",
-        mafate.WithBaseURL("http://localhost:8080"),
-        // mafate.WithTimeout(10*time.Second), // optional, default 30 s
-    )
+    client := mafate.New("eaas_sk_...")
+    // Optional: custom base URL or timeout
+    // client := mafate.New("eaas_sk_...",
+    //     mafate.WithBaseURL("https://api.your-domain.io"),
+    //     mafate.WithTimeout(10*time.Second),
+    // )
 
     ctx := context.Background()
 
@@ -146,7 +148,7 @@ All methods return a standard Go `error`. Two concrete types are available:
 ```go
 import (
     "errors"
-    mafate "github.com/mafate-security/mafate-go"
+    mafate "github.com/AxiomMarketing/mafate-go"
 )
 
 _, err := client.Keys.Get(ctx, "bad-id")
