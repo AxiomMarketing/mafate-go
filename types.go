@@ -91,6 +91,11 @@ type ApiKey struct {
 	Status      string   `json:"status"`
 	CreatedAt   string   `json:"created_at"`
 	ExpiresAt   string   `json:"expires_at,omitempty"`
+
+	// AllowedIPs : restriction d'adresses en vigueur sur cette clé. Le serveur ne
+	// renvoie ce champ que s'il est non vide (`apikeys.go:171`), donc son absence
+	// signifie « aucune restriction », pas « inconnu ».
+	AllowedIPs []string `json:"allowed_ips,omitempty"`
 }
 
 // ApiKeyWithSecret extends ApiKey and is only returned on creation.
@@ -104,6 +109,14 @@ type CreateApiKeyRequest struct {
 	Name        string   `json:"name"`
 	Permissions []string `json:"permissions"`
 	ExpiresAt   string   `json:"expires_at,omitempty"`
+
+	// AllowedIPs restreint l'usage de cette clé à un ensemble d'adresses ou de
+	// plages CIDR. Le serveur refuse toute requête venant d'ailleurs avec un 403
+	// `ip_not_allowed` (contrôle C16, `middleware.go:92`).
+	//
+	// Vide ou absent = aucune restriction. C'est un contrôle de sécurité réel du
+	// serveur qu'AUCUN des 3 SDK n'exposait : une capacité morte côté client.
+	AllowedIPs []string `json:"allowed_ips,omitempty"`
 }
 
 // UpdateApiKeyRequest is the payload for PATCH /v1/api-keys/{id}.
