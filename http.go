@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -47,6 +49,16 @@ func newHTTPClient(baseURL, apiKey string, transport http.RoundTripper, timeout 
 			},
 		},
 	}
+}
+
+// pathSegment échappe un identifiant destiné à un segment de chemin.
+//
+// url.PathEscape échappe `/`, ce qui empêche un identifiant comme `../../v1/keys`
+// de sortir du chemin prévu et de frapper une autre route. Les identifiants
+// légitimes (UUID) ne contiennent que des caractères non réservés et traversent
+// cette fonction inchangés.
+func pathSegment(value string) string {
+	return url.PathEscape(value)
 }
 
 // buildURL constructs the full request URL, appending any query parameters.
@@ -97,7 +109,7 @@ func (c *httpClient) do(ctx context.Context, method, path string, params map[str
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return &MafateError{Message: fmt.Sprintf("execute request: %s", err)}
+		return translateTransportError(err, c.httpClient.Timeout)
 	}
 	defer resp.Body.Close()
 
@@ -130,6 +142,36 @@ func (c *httpClient) do(ctx context.Context, method, path string, params map[str
 		return &MafateError{Message: fmt.Sprintf("decode response: %s", err)}
 	}
 	return nil
+}
+
+// translateTransportError distingue un dépassement de délai d'un échec de
+// connexion, et enveloppe les deux dans la hiérarchie du SDK.
+//
+// Auparavant tout ressortait en MafateError générique avec « execute request: »
+// en préfixe : l'appelant ne pouvait pas distinguer « le serveur est lent »
+// (réessayer a du sens) de « l'hôte est faux » (réessayer ne sert à rien).
+// Node et Python exposent désormais TimeoutError et ConnectionError ; Go fait de
+// même, avec ses propres idiomes (errors.As plutôt que instanceof).
+func translateTransportError(err error, timeout time.Duration) error {
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return &TimeoutError{
+			MafateError:    MafateError{Message: fmt.Sprintf("la requête a dépassé le délai imparti de %s", timeout)},
+			TimeoutSeconds: timeout.Seconds(),
+		}
+	}
+
+	if errors.Is(err, context.DeadlineExceeded) {
+		return &TimeoutError{
+			MafateError:    MafateError{Message: fmt.Sprintf("la requête a dépassé le délai imparti de %s", timeout)},
+			TimeoutSeconds: timeout.Seconds(),
+		}
+	}
+
+	return &ConnectionError{
+		MafateError: MafateError{Message: fmt.Sprintf("l'API MAFATE n'a pas pu être jointe : %s", err)},
+		Cause:       err,
+	}
 }
 
 // decodeError reads the response body and attempts to parse an RFC 7807

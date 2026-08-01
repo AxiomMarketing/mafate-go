@@ -31,7 +31,7 @@ func (s *ApiKeysService) Create(ctx context.Context, req CreateApiKeyRequest) (*
 // Update changes the permissions or expiry of an existing API key.
 func (s *ApiKeysService) Update(ctx context.Context, id string, req UpdateApiKeyRequest) (*ApiKey, error) {
 	var out ApiKey
-	if err := s.http.patch(ctx, fmt.Sprintf("/v1/api-keys/%s", id), req, &out); err != nil {
+	if err := s.http.patch(ctx, fmt.Sprintf("/v1/api-keys/%s", pathSegment(id)), req, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -39,5 +39,5 @@ func (s *ApiKeysService) Update(ctx context.Context, id string, req UpdateApiKey
 
 // Revoke permanently revokes an API key. Revoked keys cannot be reinstated.
 func (s *ApiKeysService) Revoke(ctx context.Context, id string) error {
-	return s.http.delete(ctx, fmt.Sprintf("/v1/api-keys/%s", id))
+	return s.http.delete(ctx, fmt.Sprintf("/v1/api-keys/%s", pathSegment(id)))
 }
