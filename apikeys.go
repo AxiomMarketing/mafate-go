@@ -31,7 +31,10 @@ func (s *ApiKeysService) Create(ctx context.Context, req CreateApiKeyRequest) (*
 // Update changes the permissions or expiry of an existing API key.
 func (s *ApiKeysService) Update(ctx context.Context, id string, req UpdateApiKeyRequest) (*ApiKey, error) {
 	var out ApiKey
-	if err := s.http.patch(ctx, fmt.Sprintf("/v1/api-keys/%s", pathSegment(id)), req, &out); err != nil {
+	// buildBody() plutôt que `req` : sérialiser la structure directement ne
+	// permettrait pas d'OMETTRE un champ, et donc pas de distinguer « conserver »
+	// de « effacer ». Voir le commentaire de UpdateApiKeyRequest.
+	if err := s.http.patch(ctx, fmt.Sprintf("/v1/api-keys/%s", pathSegment(id)), req.buildBody(), &out); err != nil {
 		return nil, err
 	}
 	return &out, nil

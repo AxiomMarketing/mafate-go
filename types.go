@@ -107,10 +107,69 @@ type CreateApiKeyRequest struct {
 }
 
 // UpdateApiKeyRequest is the payload for PATCH /v1/api-keys/{id}.
-// Use a pointer for ExpiresAt so an explicit null can be sent to clear it.
+//
+// TROIS états par champ, exprimés avec DEUX champs Go. C'est délibéré, et un
+// pointeur seul ne peut pas y suffire :
+//
+//	ne rien passer          → le champ est ABSENT du corps  → le serveur CONSERVE
+//	Clear<Champ> = true     → le champ vaut null            → le serveur EFFACE
+//	<Champ> = &valeur       → le champ porte la valeur      → le serveur POSE
+//
+// ⚠️ Le commentaire précédent affirmait « Use a pointer for ExpiresAt so an
+// explicit null can be sent to clear it » — c'était FAUX : `omitempty` OMET un
+// pointeur nil, donc aucun null n'a jamais pu partir d'ici.
+//
+// ⚠️ Et le simple retrait d'`omitempty` aurait été PIRE, pas mieux : nil aurait
+// alors produit `"expires_at": null` à CHAQUE appel, donc un client mettant à
+// jour ses seules permissions aurait EFFACÉ l'expiration de sa clé. Mesuré.
+// C'est exactement la régression que la sémantique à trois états existe pour
+// empêcher, transposée côté client.
+//
+// Le corps JSON est construit par Update() à partir de ces champs, et non par
+// sérialisation directe de cette structure — c'est ce qui permet d'omettre
+// réellement un champ.
 type UpdateApiKeyRequest struct {
-	Permissions []string `json:"permissions,omitempty"`
-	ExpiresAt   *string  `json:"expires_at,omitempty"`
+	// Permissions : nil ou vide → absent du corps. Il n'y a pas d'effacement
+	// prévu ici, une clé sans permission ne pouvant rien faire (la révocation est
+	// l'opération prévue pour ça).
+	Permissions []string
+
+	ExpiresAt      *string
+	ClearExpiresAt bool
+
+	AllowedIPs      []string
+	ClearAllowedIPs bool
+}
+
+// buildBody produit le corps JSON en n'incluant QUE les champs demandés.
+//
+// Un champ absent de la map est absent du JSON : c'est la seule façon d'obtenir
+// les trois états, `omitempty` ne sachant distinguer « nil » de « vide ».
+func (r UpdateApiKeyRequest) buildBody() map[string]interface{} {
+	body := make(map[string]interface{})
+
+	if len(r.Permissions) > 0 {
+		body["permissions"] = r.Permissions
+	}
+
+	// L'effacement l'emporte sur la valeur : demander les deux est une
+	// contradiction de l'appelant, et effacer est le choix le moins surprenant —
+	// il correspond à l'intention explicitement exprimée par le drapeau.
+	switch {
+	case r.ClearExpiresAt:
+		body["expires_at"] = nil
+	case r.ExpiresAt != nil:
+		body["expires_at"] = *r.ExpiresAt
+	}
+
+	switch {
+	case r.ClearAllowedIPs:
+		body["allowed_ips"] = nil
+	case len(r.AllowedIPs) > 0:
+		body["allowed_ips"] = r.AllowedIPs
+	}
+
+	return body
 }
 
 // ListApiKeysResponse is the envelope returned by GET /v1/api-keys.

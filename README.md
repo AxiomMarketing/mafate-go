@@ -107,12 +107,23 @@ created, err := client.ApiKeys.Create(ctx, mafate.CreateApiKeyRequest{
 })
 fmt.Println("save this secret:", created.Secret)
 
-// Update permissions or expiry
+// Update permissions or expiry — TROIS états par champ :
+//   rien passé            -> le serveur CONSERVE
+//   Clear<Champ> = true   -> le serveur EFFACE
+//   <Champ> = &valeur     -> le serveur POSE
 expires := "2027-01-01T00:00:00Z"
 updated, err := client.ApiKeys.Update(ctx, created.ID, mafate.UpdateApiKeyRequest{
     Permissions: []string{"encrypt"},
     ExpiresAt:   &expires,
 })
+
+// L'expiration est RETIRÉE ; les permissions et les adresses autorisées, absentes
+// de la requête, sont CONSERVÉES.
+updated, err = client.ApiKeys.Update(ctx, created.ID, mafate.UpdateApiKeyRequest{
+    ClearExpiresAt: true,
+})
+
+// Un ExpiresAt nil n'envoie RIEN : il ne peut pas effacer par inadvertance.
 
 // Revoke permanently
 err = client.ApiKeys.Revoke(ctx, created.ID)
