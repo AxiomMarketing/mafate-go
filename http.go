@@ -27,6 +27,24 @@ func newHTTPClient(baseURL, apiKey string, transport http.RoundTripper, timeout 
 		httpClient: &http.Client{
 			Transport: transport,
 			Timeout:   timeout,
+
+			// Aucune redirection n'est suivie.
+			//
+			// Par défaut Go en suit jusqu'à 10, et sur un 307/308 il REJOUE le corps
+			// vers l'hôte de Location. Ce corps porte aujourd'hui le base64 du clair ;
+			// en mode enveloppe il portera la DEK. Le serveur MAFATE n'émet aucun 3xx :
+			// une redirection sur un appel d'API est donc soit une mauvaise
+			// configuration, soit une attaque, jamais un fonctionnement normal.
+			//
+			// Second défaut fermé au passage : shouldCopyHeaderOnRedirect ne compare que
+			// le DOMAINE, pas le schéma. Une redirection vers un sous-domaine en http://
+			// conservait l'en-tête Authorization, envoyant le Bearer eaas_sk_ en clair.
+			//
+			// ErrUseLastResponse ne produit pas d'erreur : il RETOURNE la réponse 3xx,
+			// que le contrôle de statut de do() transforme ensuite en ApiError.
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
 		},
 	}
 }
@@ -82,6 +100,23 @@ func (c *httpClient) do(ctx context.Context, method, path string, params map[str
 		return &MafateError{Message: fmt.Sprintf("execute request: %s", err)}
 	}
 	defer resp.Body.Close()
+
+	// Les 3xx sont traités AVANT le cas général : le corps d'une redirection est
+	// vide ou sans intérêt, et le message par défaut ("301 Moved Permanently")
+	// n'orienterait vers rien.
+	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		return &ApiError{
+			Status: resp.StatusCode,
+			Title:  "redirection refusée",
+			Detail: fmt.Sprintf(
+				"l'API a répondu %d vers %q. Le SDK ne suit aucune redirection : sur un 307/308 "+
+					"le corps de la requête serait rejoué vers cet hôte. Cause la plus fréquente : "+
+					"une baseURL en http:// — mais la clé d'API et le corps sont alors DÉJÀ partis "+
+					"en clair, la redirection arrivant après. Utilisez https://.",
+				resp.StatusCode, resp.Header.Get("Location"),
+			),
+		}
+	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return c.decodeError(resp)
