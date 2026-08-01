@@ -83,10 +83,27 @@ func (c *Client) Health(ctx context.Context) (*HealthResponse, error) {
 // Encrypt encodes plaintext to base64 and calls POST /v1/encrypt.
 // The returned EncryptedData can be passed directly to Decrypt.
 func (c *Client) Encrypt(ctx context.Context, plaintext string, keyID string) (*EncryptedData, error) {
-	return encrypt(ctx, c.http, plaintext, keyID)
+	return encryptBytes(ctx, c.http, []byte(plaintext), keyID)
 }
 
-// Decrypt calls POST /v1/decrypt and base64-decodes the result to a UTF-8 string.
+// EncryptBytes chiffre des octets bruts. Symétrique de DecryptBytes : une charge
+// binaire (PDF, image, archive, protobuf) doit pouvoir faire l'aller-retour.
+func (c *Client) EncryptBytes(ctx context.Context, plaintext []byte, keyID string) (*EncryptedData, error) {
+	return encryptBytes(ctx, c.http, plaintext, keyID)
+}
+
+// Decrypt calls POST /v1/decrypt and returns the plaintext as a UTF-8 string.
+//
+// Renvoie une erreur si le clair n'est pas de l'UTF-8 valide : utilisez
+// DecryptBytes pour une charge binaire. Voir le commentaire de decrypt() dans
+// crypto.go — c'est un changement de comportement assumé, Go étant le seul des
+// trois SDK à ne rien perdre auparavant.
 func (c *Client) Decrypt(ctx context.Context, data *EncryptedData) (string, error) {
 	return decrypt(ctx, c.http, data)
+}
+
+// DecryptBytes renvoie les octets bruts du clair, sans exiger d'UTF-8 valide.
+// C'est la primitive ; Decrypt est une surcouche.
+func (c *Client) DecryptBytes(ctx context.Context, data *EncryptedData) ([]byte, error) {
+	return decryptBytes(ctx, c.http, data)
 }

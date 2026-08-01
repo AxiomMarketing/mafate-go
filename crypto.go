@@ -4,19 +4,20 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"unicode/utf8"
 )
 
-// encrypt is the shared implementation used by Client.Encrypt.
-// It encodes plaintext as standard base64 before sending it to the API.
-func encrypt(ctx context.Context, hc *httpClient, plaintext string, keyID string) (*EncryptedData, error) {
-	if plaintext == "" {
+// encryptBytes chiffre des OCTETS bruts. Primitive symétrique de decryptBytes :
+// une charge binaire doit pouvoir faire l'aller-retour complet.
+func encryptBytes(ctx context.Context, hc *httpClient, plaintext []byte, keyID string) (*EncryptedData, error) {
+	if len(plaintext) == 0 {
 		return nil, &MafateError{Message: "plaintext must not be empty"}
 	}
 	if keyID == "" {
 		return nil, &MafateError{Message: "keyID must not be empty"}
 	}
 
-	encoded := base64.StdEncoding.EncodeToString([]byte(plaintext))
+	encoded := base64.StdEncoding.EncodeToString(plaintext)
 
 	payload := map[string]string{
 		"plaintext": encoded,
@@ -41,11 +42,13 @@ func (c *Client) Hash(ctx context.Context, value, keyID string) (string, error) 
 	return res.Hash, nil
 }
 
-// decrypt is the shared implementation used by Client.Decrypt.
-// The API returns plaintext as base64; this function decodes it back to UTF-8.
-func decrypt(ctx context.Context, hc *httpClient, data *EncryptedData) (string, error) {
+// decryptBytes renvoie les OCTETS bruts du clair.
+//
+// C'est la primitive : toute charge binaire (PDF, image, archive, protobuf) doit
+// passer par ici. decrypt() est une surcouche qui exige de l'UTF-8 valide.
+func decryptBytes(ctx context.Context, hc *httpClient, data *EncryptedData) ([]byte, error) {
 	if data == nil {
-		return "", &MafateError{Message: "encrypted data must not be nil"}
+		return nil, &MafateError{Message: "encrypted data must not be nil"}
 	}
 
 	payload := map[string]interface{}{
@@ -58,12 +61,40 @@ func decrypt(ctx context.Context, hc *httpClient, data *EncryptedData) (string, 
 
 	var raw decryptResponse
 	if err := hc.post(ctx, "/v1/decrypt", payload, &raw); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	decoded, err := base64.StdEncoding.DecodeString(raw.Plaintext)
 	if err != nil {
-		return "", &MafateError{Message: fmt.Sprintf("decode plaintext base64: %s", err)}
+		return nil, &MafateError{Message: fmt.Sprintf("decode plaintext base64: %s", err)}
 	}
+	return decoded, nil
+}
+
+// decrypt renvoie le clair en UTF-8 valide.
+//
+// ⚠️ CHANGEMENT DE COMPORTEMENT ASSUMÉ. Go était le seul des trois SDK à ne rien
+// perdre : `string([]byte)` copie les octets verbatim, une chaîne Go n'ayant pas à
+// être de l'UTF-8 valide. Un appelant qui faisait transiter du binaire par
+// Decrypt() récupérait donc ses octets intacts, et cette validation le lui refuse
+// désormais.
+//
+// C'est délibéré. Node corrompait en silence (U+FFFD) et Python levait une
+// exception portant le clair : aligner les trois sur « decrypt() rend du texte,
+// DecryptBytes() rend des octets » vaut mieux que trois comportements distincts
+// pour une même signature. Le correctif est DecryptBytes, pas un contournement.
+func decrypt(ctx context.Context, hc *httpClient, data *EncryptedData) (string, error) {
+	decoded, err := decryptBytes(ctx, hc, data)
+	if err != nil {
+		return "", err
+	}
+
+	if !utf8.Valid(decoded) {
+		return "", &MafateError{
+			Message: "le clair déchiffré n'est pas de l'UTF-8 valide. " +
+				"Utilisez DecryptBytes() pour récupérer les octets bruts.",
+		}
+	}
+
 	return string(decoded), nil
 }
