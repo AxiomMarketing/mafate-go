@@ -1,5 +1,13 @@
 # Journal des modifications
 
+## v0.2.2 — 2026-08-02
+
+### Correction de publication
+
+Aucun changement de code. La 0.2.1 n'a jamais atteint le registre : la
+configuration du workflow court-circuitait le Trusted Publishing OIDC.
+
+
 ## v0.2.1 — 2026-08-02
 
 ### Correction de distribution
