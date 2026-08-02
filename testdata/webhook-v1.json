@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "comment": [
+    "Corpus de conformité PARTAGÉ pour la vérification de signature de webhook.",
+    "Consommé par les trois SDK (Go, Node, Python). Une divergence de contrat entre",
+    "eux fait rougir au moins un des trois.",
+    "",
+    "Dérivé du signeur réel : apps/dashboard/app/services/webhook_service.ts:51-53",
+    "signe `${timestamp}.${payload}` et envoie TOUJOURS l'en-tête X-Mafate-Timestamp.",
+    "C'est pourquoi la vérification EXIGE le timestamp : il n'existe aucun webhook",
+    "MAFATE légitime signé sur le payload seul.",
+    "",
+    "Les cas dépendant du temps portent un décalage RELATIF (timestamp_offset_seconds)",
+    "calculé à l'exécution. Un horodatage figé serait une bombe à retardement : le test",
+    "casserait le jour où le vecteur sort de la tolérance.",
+    "",
+    "⚠️ SDK-11 / ENV-07 : le miroir public de sdk-go DOIT embarquer ce fichier, sinon",
+    "`go test` y échoue. L'échec bruyant est voulu — un test qui se contente de sauter",
+    "quand le corpus manque ne prouve plus rien."
+  ],
+
+  "secret": "whsec_test_do_not_use_in_production",
+  "payload": "{\"event\":\"key.rotated\",\"key_id\":\"key_abc123\"}",
+
+  "frozen": {
+    "comment": [
+      "Vecteur figé : même secret, même payload, horodatage fixe. Les trois SDK",
+      "doivent produire ET accepter cette signature exacte. C'est le point d'ancrage",
+      "de la conformité croisée — si un SDK change d'algorithme, seul ce cas le voit.",
+      "La tolérance est neutralisée par le test (calculée depuis l'âge réel du",
+      "vecteur), la fenêtre anti-rejeu étant couverte par les cas relatifs."
+    ],
+    "timestamp": "1767225600",
+    "signature": "fe7e1fbb7d1058733accb6d105d8accdb136b763175fe2db12db9e6f9a919aed"
+  },
+
+  "cases": [
+    {
+      "name": "signature valide et fraiche",
+      "timestamp_offset_seconds": 0,
+      "signature": "@correct",
+      "expected": true
+    },
+    {
+      "name": "prefixe sha256= tolere",
+      "timestamp_offset_seconds": 0,
+      "signature": "@correct",
+      "signature_prefix": "sha256=",
+      "expected": true
+    },
+    {
+      "name": "signature en hexadecimal majuscule acceptee",
+      "comment": "Les 3 SDK décodent l'hexadécimal avant de comparer, donc la casse ne porte aucun sens. Ce cas verrouille cette identité : une comparaison de CHAÎNES le rejetterait.",
+      "timestamp_offset_seconds": 0,
+      "signature": "@correct_uppercase",
+      "expected": true
+    },
+    {
+      "name": "payload altere d un seul caractere",
+      "comment": "La signature est calculée sur le payload CANONIQUE ; `verified_payload` est ce qui arrive au vérificateur. C'est le scénario réel d'une altération en transit — signer le payload déjà altéré produirait une signature légitime et le cas passerait à tort.",
+      "timestamp_offset_seconds": 0,
+      "signature": "@correct",
+      "verified_payload": "{\"event\":\"key.rotated\",\"key_id\":\"key_abc124\"}",
+      "expected": false
+    },
+    {
+      "name": "mauvais secret",
+      "timestamp_offset_seconds": 0,
+      "signature": "@correct_wrong_secret",
+      "expected": false
+    },
+    {
+      "name": "horodatage expire d une heure",
+      "timestamp_offset_seconds": -3600,
+      "signature": "@correct",
+      "expected": false
+    },
+    {
+      "name": "horodatage dans le futur d une heure",
+      "timestamp_offset_seconds": 3600,
+      "signature": "@correct",
+      "expected": false
+    },
+    {
+      "name": "horodatage non numerique",
+      "comment": "La signature est CALCULÉE pour cet horodatage, donc le HMAC correspond : seul le garde de parsing peut justifier le refus. Une signature bidon serait rejetée par le HMAC, que le garde existe ou non — un test décoratif.",
+      "timestamp_literal": "pas-un-nombre",
+      "signature": "@correct",
+      "expected": false
+    },
+    {
+      "name": "horodatage vide",
+      "comment": "Le serveur envoie toujours l'en-tête. Une chaîne vide signifie en-tête absent ou retiré : refus.",
+      "timestamp_literal": "",
+      "signature": "@correct",
+      "expected": false
+    },
+    {
+      "name": "horodatage vide avec signature du payload SEUL",
+      "comment": [
+        "Le cas ci-dessus ne suffit PAS : sa signature porte sur `.{payload}`, qui ne",
+        "correspond ni avec ni sans la branche morte. Il passait donc que le repli",
+        "existe ou non — un garde décoratif, démasqué par mutation le 01/08/2026.",
+        "",
+        "Ici la signature porte sur le payload SEUL, exactement ce que calculait le",
+        "repli supprimé. L'accepter prouve que la branche est encore là."
+      ],
+      "timestamp_literal": "",
+      "signature": "@payload_only",
+      "expected": false
+    },
+    {
+      "name": "signature non-ASCII de 64 caracteres",
+      "comment": "63 hex + un caractère non-ASCII. Faisait lever RangeError en Node (garde de longueur en UTF-16 puis comparaison en octets) et TypeError en Python (compare_digest sur des str non-ASCII). L'exception remontait dans le gestionnaire de webhook de l'utilisateur : 500 à la demande, non authentifié.",
+      "timestamp_offset_seconds": 0,
+      "signature_literal": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaé",
+      "expected": false
+    },
+    {
+      "name": "signature trop courte",
+      "timestamp_offset_seconds": 0,
+      "signature_literal": "deadbeef",
+      "expected": false
+    },
+    {
+      "name": "signature trop longue",
+      "timestamp_offset_seconds": 0,
+      "signature_literal": "fe7e1fbb7d1058733accb6d105d8accdb136b763175fe2db12db9e6f9a919aedff",
+      "expected": false
+    },
+    {
+      "name": "signature de 64 caracteres non hexadecimaux",
+      "timestamp_offset_seconds": 0,
+      "signature_literal": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+      "expected": false
+    },
+    {
+      "name": "signature vide",
+      "timestamp_offset_seconds": 0,
+      "signature_literal": "",
+      "expected": false
+    }
+  ]
+}

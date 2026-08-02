@@ -10,8 +10,8 @@ package mafate
 // Un t.Skip serait un garde décoratif — il rendrait l'absence du corpus
 // indiscernable de sa satisfaction.
 //
-// ⚠️ SDK-11 / ENV-07 : le miroir public de ce paquet doit embarquer le corpus,
-// sinon `go test` y échoue. L'échec bruyant est voulu.
+// Le corpus voyage AVEC le paquet (testdata/), donc `go test` fonctionne aussi
+// dans le miroir public. Ce n'était pas le cas en v0.2.0.
 
 import (
 	"crypto/hmac"
@@ -50,7 +50,12 @@ type vectorFile struct {
 func loadVectors(t *testing.T) vectorFile {
 	t.Helper()
 
-	path := filepath.Join("..", "test-vectors", "webhook-v1.json")
+	// ⚠️ Corpus lu depuis testdata/, copie locale au paquet — PAS depuis
+	// packages/test-vectors/ du monorepo. Le subtree split n'emporte que le
+	// contenu de packages/sdk-go/, et un chemin remontant hors du paquet casse
+	// `go test` dans le miroir public. `testdata/` est en outre la convention Go :
+	// le compilateur ignore ce répertoire.
+	path := filepath.Join("testdata", "webhook-v1.json")
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("corpus de vecteurs partagé illisible (%s) : %v", path, err)

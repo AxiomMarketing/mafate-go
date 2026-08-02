@@ -1,5 +1,22 @@
 # Journal des modifications
 
+## v0.2.1 — 2026-08-02
+
+### Correction de distribution
+
+Le corpus de vecteurs de conformité voyage désormais **avec le paquet**. Il était
+lu depuis un chemin remontant hors du paquet, ce qui fonctionnait dans le
+monorepo mais **cassait les tests du dépôt public** — et a fait échouer la
+publication de la 0.2.0.
+
+⚠️ La v0.2.0 est publiée et **reste utilisable** — `go get` et le code
+fonctionnent. Seul `go test ./...` du module lui-même y échoue. Un tag Go étant
+immuable dans le cache du proxy, la correction ne pouvait passer que par une
+version suivante.
+
+Aucun changement de code applicatif : la 0.2.1 est fonctionnellement identique à
+la 0.2.0.
+
 ## v0.2.0 — 2026-08-02
 
 ### Changements incompatibles
