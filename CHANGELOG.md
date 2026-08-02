@@ -1,5 +1,13 @@
 # Journal des modifications
 
+## v0.2.3 — 2026-08-02
+
+### Correction de publication
+
+Aucun changement de code. Les 0.2.1 et 0.2.2 n'ont jamais atteint le registre :
+la configuration du workflow empêchait l'échange OIDC, de deux façons opposées.
+
+
 ## v0.2.2 — 2026-08-02
 
 ### Correction de publication
