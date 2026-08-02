@@ -107,3 +107,29 @@ func (c *Client) Decrypt(ctx context.Context, data *EncryptedData) (string, erro
 func (c *Client) DecryptBytes(ctx context.Context, data *EncryptedData) ([]byte, error) {
 	return decryptBytes(ctx, c.http, data)
 }
+
+// EncryptLocal chiffre EN LOCAL : le clair ne quitte jamais ce processus, seule
+// la clé de données part se faire emballer.
+//
+// MAFATE ne détenant NI la donnée NI le chiffré, une compromission de MAFATE
+// seule ne permet rien : il faudrait aussi compromettre votre base.
+//
+// Encrypt reste disponible et légitime : un service incapable d'exécuter de la
+// cryptographie côté client existe.
+func (c *Client) EncryptLocal(ctx context.Context, plaintext []byte, keyID string) (*EnvelopeData, error) {
+	return encryptLocal(ctx, c.http, plaintext, keyID)
+}
+
+// DecryptLocalBytes déchiffre EN LOCAL et renvoie les octets bruts.
+// C'est la primitive ; DecryptLocal est une surcouche qui exige de l'UTF-8.
+func (c *Client) DecryptLocalBytes(ctx context.Context, data *EnvelopeData) ([]byte, error) {
+	return decryptLocal(ctx, c.http, data)
+}
+
+// DecryptLocal déchiffre EN LOCAL et renvoie le clair en UTF-8 valide.
+//
+// Renvoie une erreur si le clair n'est pas de l'UTF-8 valide : utilisez
+// DecryptLocalBytes pour une charge binaire.
+func (c *Client) DecryptLocal(ctx context.Context, data *EnvelopeData) (string, error) {
+	return decryptLocalToString(ctx, c.http, data)
+}

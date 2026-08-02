@@ -97,9 +97,12 @@ func (c envVectorCase) plaintext(t *testing.T) []byte {
 // direct : appeler une fonction inexistante ne compilerait pas, et un paquet qui
 // ne compile pas empêcherait TOUS les autres tests de tourner — l'échec ne serait
 // plus ciblé.
+// ENV-07 : branchement sur l'implémentation réelle, exactement comme le
+// commentaire ci-dessus l'instruisait. Le harnais avait été écrit AVANT elle et
+// n'a été modifié QUE sur ces deux lignes : la cible n'a pas été ajustée au tir.
 var (
-	sealEnvelopeFn func(key, iv, plaintext []byte) ([]byte, error)
-	openEnvelopeFn func(key, iv, ciphertext []byte) ([]byte, error)
+	sealEnvelopeFn = SealEnvelope
+	openEnvelopeFn = OpenEnvelope
 )
 
 func requireEnvelopeAPI(t *testing.T) {

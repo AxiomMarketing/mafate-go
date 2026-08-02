@@ -71,6 +71,38 @@ type EncryptedData struct {
 	KeyVersion int    `json:"key_version"`
 }
 
+// EnvelopeData est le résultat d'un chiffrement LOCAL (mode enveloppe).
+//
+// Distinct d'EncryptedData à dessein : les deux se ressemblent, mais le clair
+// n'a JAMAIS transité pour celui-ci. Les confondre dans un même type ferait
+// perdre cette distinction au premier remaniement, alors qu'elle porte tout
+// l'argument de sécurité du mode.
+type EnvelopeData struct {
+	// Ciphertext est le chiffré base64, TAG GCM CONCATÉNÉ (contrat ENV-00).
+	Ciphertext string `json:"ciphertext"`
+	// WrappedKey est un jeton OPAQUE rendu par le serveur. Ne pas tenter de
+	// l'interpréter : son format interne peut changer, seule sa présentation à
+	// unwrap est stable.
+	WrappedKey string `json:"wrapped_key"`
+	// IV base64, 12 octets, tiré à chaque opération.
+	IV         string `json:"iv"`
+	KeyID      string `json:"key_id"`
+	KeyVersion int    `json:"key_version"`
+	// EnvelopeVersion permet une migration future du format sans ambiguïté.
+	EnvelopeVersion int `json:"envelope_version"`
+}
+
+// wrapResponse est la réponse brute de POST /v1/keys/{id}/wrap.
+type wrapResponse struct {
+	WrappedKey string `json:"wrapped_key"`
+	KeyVersion int    `json:"key_version"`
+}
+
+// unwrapResponse est la réponse brute de POST /v1/keys/{id}/unwrap.
+type unwrapResponse struct {
+	DEK string `json:"dek"`
+}
+
 // decryptResponse is the raw response from POST /v1/decrypt.
 type decryptResponse struct {
 	Plaintext string `json:"plaintext"`
