@@ -1,0 +1,128 @@
+{
+  "version": 1,
+  "algorithm": "AES-256-GCM",
+  "comment": [
+    "Vecteurs de conformité du MODE ENVELOPPE, partagés par les 4 implémentations",
+    "(serveur EaaS + SDK Go, Node, Python).",
+    "",
+    "ÉCRITS AVANT TOUTE IMPLÉMENTATION CÔTÉ SDK. Le format est un CONTRAT PUBLIC :",
+    "il se fige avant, pas après. Le pire scénario du lot serait trois SDK chiffrant",
+    "chacun légèrement différemment — une donnée écrite en Go illisible depuis Node.",
+    "Ce défaut ne se voit qu'à la première lecture croisée, chez un client, des mois",
+    "plus tard, sur des données qu'on ne peut plus lire.",
+    "",
+    "FORMAT FIGÉ PAR LA DÉCISION ENV-00 du 02/08/2026 :",
+    "  version d'enveloppe : v1",
+    "  IV                  : 96 bits (12 octets), aléatoire par opération en usage réel",
+    "  tag GCM             : CONCATÉNÉ au chiffré (convention Go native)",
+    "  encodage JSON       : base64 STANDARD, pas base64url",
+    "",
+    "Valeurs produites par la crypto de RÉFÉRENCE du serveur",
+    "(internal/crypto/envelope.go), pas inventées, et vérifiées contre elle."
+  ],
+  "reading_rules": [
+    "PRÉCÉDENCE, à respecter à l'identique dans les 4 implémentations :",
+    "",
+    "  clair   : si `plaintext_repeat` est présent, il PRIME sur `plaintext_b64`.",
+    "            Sinon, décoder `plaintext_b64`.",
+    "  chiffré : si `ciphertext_sha256` est non vide, comparer l'EMPREINTE.",
+    "            Sinon, si `ciphertext_b64` est non vide, comparer les OCTETS.",
+    "            Sinon, le reconstruire en scellant le clair.",
+    "",
+    "⚠️ TOUTES les clés sont TOUJOURS présentes, éventuellement à chaîne vide.",
+    "Une première version omettait `plaintext_b64` sur le cas « clair vide » —",
+    "conséquence d'un `omitempty` — et les 3 implémentations réagissaient",
+    "DIFFÉREMMENT au même vecteur : Node lisait une chaîne vide, Python levait un",
+    "KeyError, Go prenait le zéro de son type. Un corpus ambigu produit exactement",
+    "la divergence qu'il est censé empêcher. Un test de bonne formation le vérifie",
+    "désormais dans les 4 implémentations.",
+    "",
+    "⚠️ Les clés et IV sont FIGÉS, jamais aléatoires : un vecteur doit produire le",
+    "même résultat sur toutes les machines, pour toujours. En usage RÉEL, l'IV doit",
+    "être aléatoire et unique — un IV réutilisé avec la même clé casse GCM",
+    "complètement, perte totale de confidentialité ET d'authenticité.",
+    "",
+    "⚠️ Node rend le tag SÉPARÉMENT via getAuthTag() là où Go et Python le",
+    "concatènent. C'est le point de divergence naturelle entre les 3 SDK, et la",
+    "raison première de ces vecteurs.",
+    "",
+    "`expect` vaut `ok` ou `auth_failure`. Les cas `auth_failure` DOIVENT échouer :",
+    "une implémentation qui les accepte n'authentifie rien."
+  ],
+  "format": {
+    "envelope_version": "v1",
+    "iv_bits": 96,
+    "tag_position": "appended_to_ciphertext",
+    "json_encoding": "base64_standard"
+  },
+  "cases": [
+    {
+      "name": "clair vide",
+      "comment": "Limite basse. GCM produit tout de même un tag de 16 octets : le chiffré n'est jamais vide.",
+      "key_b64": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "iv_b64": "oKGio6Slpqeoqaqr",
+      "plaintext_b64": "",
+      "ciphertext_b64": "XGmWJa9Lk6D4IgoqYRnF0A==",
+      "expect": "ok"
+    },
+    {
+      "name": "ASCII",
+      "comment": "Cas nominal.",
+      "key_b64": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "iv_b64": "oKGio6Slpqeoqaqr",
+      "plaintext_b64": "c2VjcmV0IGJhbmNhaXJl",
+      "ciphertext_b64": "lX0fXyC/It0DC+SybgilkxTbOdtXvhpZyqHIZyPWaA==",
+      "expect": "ok"
+    },
+    {
+      "name": "UTF-8 multi-octets",
+      "comment": "Accents et emoji : vérifie qu'aucune implémentation ne passe par une conversion de chaîne fautive.",
+      "key_b64": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "iv_b64": "oKGio6Slpqeoqaqr",
+      "plaintext_b64": "ZG9ubsOpZXMgY29uZmlkZW50aWVsbGVzIOKAlCDwn5SQIGNoaWZmcmVtZW50",
+      "ciphertext_b64": "gncSQ4ZiZ8xCBui9YROkux7YMHX+2ycfvOymEl9b6pVCViSXxkQ1TzrxYaZ97FvI+833/rzANS6fo53blA==",
+      "expect": "ok"
+    },
+    {
+      "name": "binaire non-UTF-8",
+      "comment": "LE cas que SDK-05 a rendu récupérable. Node corrompait silencieusement ces octets ; sans ce vecteur, la dissymétrie corrigée ne serait pas couverte.",
+      "key_b64": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "iv_b64": "oKGio6Slpqeoqaqr",
+      "plaintext_b64": "JVBERgAB//6Agf0=",
+      "ciphertext_b64": "w0g4a0XK/UHi5HoxuFSCjcDFWDRiwOPMmW2n",
+      "expect": "ok"
+    },
+    {
+      "name": "clair de 1 Mo",
+      "comment": "Mise à l'échelle. Le clair est un motif reproductible et seule l'empreinte SHA-256 du chiffré est figée : stocker 1,4 Mo de base64 rendrait le fichier inutilisable.",
+      "key_b64": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "iv_b64": "oKGio6Slpqeoqaqr",
+      "plaintext_b64": "",
+      "plaintext_repeat": {
+        "byte_hex": "5a",
+        "length": 1048576
+      },
+      "ciphertext_b64": "",
+      "ciphertext_sha256": "fb2659797a6f365ce80778c5f2055cb45dd898e346d095f1514619d434544c3d",
+      "expect": "ok"
+    },
+    {
+      "name": "tag altéré d'un seul bit",
+      "comment": "DOIT échouer. Le dernier octet du tag est inversé d'un bit. Une implémentation qui accepte ce cas n'authentifie rien : GCM ne serait plus qu'un chiffrement, sans intégrité.",
+      "key_b64": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "iv_b64": "oKGio6Slpqeoqaqr",
+      "plaintext_b64": "c2VjcmV0IGJhbmNhaXJl",
+      "ciphertext_b64": "lX0fXyC/It0DC+SybgilkxTbOdtXvhpZyqHIZyPWaQ==",
+      "expect": "auth_failure"
+    },
+    {
+      "name": "chiffré altéré d'un seul bit",
+      "comment": "DOIT échouer. Distinct du tag altéré : vérifie que l'authentification couvre le CORPS et pas seulement le tag.",
+      "key_b64": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "iv_b64": "oKGio6Slpqeoqaqr",
+      "plaintext_b64": "c2VjcmV0IGJhbmNhaXJl",
+      "ciphertext_b64": "lH0fXyC/It0DC+SybgilkxTbOdtXvhpZyqHIZyPWaA==",
+      "expect": "auth_failure"
+    }
+  ]
+}
