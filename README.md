@@ -177,3 +177,22 @@ if err != nil {
 ## License
 
 MIT — Copyright (c) 2026 UNIVILE SAS
+
+## Licence et spécification
+
+Ce SDK est publié sous **licence MIT** (voir `LICENSE`). Son code source est
+public : https://github.com/AxiomMarketing/mafate-go
+
+Le **format d'enveloppe** produit par le mode local est spécifié dans
+[`ENVELOPE-SPEC.md`](./ENVELOPE-SPEC.md). C'est un contrat public et figé : il
+décrit assez précisément le format pour qu'un tiers puisse le réimplémenter, ou
+déchiffrer ses propres données sans MAFATE.
+
+Les vecteurs de test figés qui accompagnent la spec sont consommés à l'identique
+par les trois SDK. Une réimplémentation qui les reproduit octet pour octet est
+conforme.
+
+⚠️ **Ce qui est ouvert, et ce qui ne l'est pas.** Le SDK et le format le sont ;
+le serveur MAFATE ne l'est pas. Concrètement, vous pouvez vérifier et
+réimplémenter la partie qui manipule vos données, mais pas celle qui garde vos
+clés.
