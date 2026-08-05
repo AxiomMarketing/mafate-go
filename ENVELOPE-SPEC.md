@@ -85,6 +85,39 @@ Les trois SDK vérifient cette propriété par un compteur d'IV distincts sur
 1 000 opérations, et la conformité croisée refuse tout jeu de cas où deux IV
 coïncident.
 
+### 4.1 Combien de fois une même clé peut chiffrer
+
+Tirer l'IV au hasard est la bonne règle, et **c'est elle qui crée une seconde
+contrainte** : deux tirages aléatoires finissent par coïncider. Sur 96 bits, la
+probabilité cesse d'être négligeable aux alentours de **2³² opérations**, soit
+environ 4,3 milliards, sous une seule et même clé. C'est la borne de
+NIST SP 800-38D §8.3 pour les IV aléatoires.
+
+⚠️ **Ce que coûte le dépassement dépasse les deux messages concernés.** Une
+collision d'IV sous une même clé GCM ne livre pas seulement leur clair : elle
+permet de retrouver la clé d'authentification du mode, donc de **forger** des
+messages que le déchiffrement acceptera. Et comme la réutilisation d'IV,
+elle ne produit aucun signal.
+
+**Règle : une clé ne doit pas dépasser 2³² opérations de chiffrement.** Le
+seuil d'action recommandé est **2³¹**, soit la moitié, pour laisser de la marge
+à une implémentation qui compte approximativement ou qui parallélise.
+
+**Au seuil, on change de clé, on ne refuse pas de chiffrer.** Le format n'impose
+aucune limite de débit et n'en est pas le lieu : atteindre 2³¹ opérations est le
+signe d'un usage intense, pas d'un abus. Une implémentation conforme demande une
+nouvelle clé de données et poursuit ; elle n'interrompt pas l'appelant.
+
+⚠️ **Cette borne se compte là où le chiffrement a lieu.** En mode local, c'est
+l'appelant qui chiffre, avec une clé qu'il détient : aucun serveur ne voit ces
+opérations et aucun ne peut donc les compter. **La responsabilité appartient à
+l'implémentation cliente.** Une rotation périodique côté serveur ne remplace pas
+ce compte, puisqu'elle ignore le volume réellement chiffré.
+
+Cette section ne change ni le format binaire, ni la représentation JSON, ni les
+vecteurs de conformité : elle porte sur le cycle de vie des clés, pas sur
+l'encodage.
+
 ---
 
 ## 5. Représentation JSON
